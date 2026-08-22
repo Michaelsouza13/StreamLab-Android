@@ -16,6 +16,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:banner="@mipmap/ic_launcher"
         android:theme="@style/Theme.StreamlabTv">
         <activity

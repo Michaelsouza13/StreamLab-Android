@@ -19,4 +19,16 @@ interface ChannelDao {
 
     @Query("DELETE FROM channels")
     suspend fun clearChannels()
+
+    @Query("SELECT * FROM channels WHERE id = :id LIMIT 1")
+    suspend fun getChannelById(id: Long): ChannelEntity?
+
+    @Query("SELECT * FROM channels WHERE url = :url LIMIT 1")
+    suspend fun getChannelByUrl(url: String): ChannelEntity?
+
+    @androidx.room.Delete
+    suspend fun deleteChannel(channel: ChannelEntity)
+
+    @androidx.room.Update
+    suspend fun updateChannel(channel: ChannelEntity)
 }

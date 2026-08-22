@@ -11,5 +11,9 @@ data class ChannelEntity(
     val logo: String,
     val url: String,
     val group: String,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    // TMDB fields
+    val tmdbId: Int? = null,
+    val posterUrl: String? = null,
+    val description: String? = null
 )
