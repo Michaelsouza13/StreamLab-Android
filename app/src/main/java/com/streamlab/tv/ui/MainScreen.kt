@@ -2,6 +2,7 @@ package com.streamlab.tv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -286,7 +287,7 @@ fun ChannelGrid(
         }
     } else {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Adaptive(minSize = 200.dp),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -313,13 +314,30 @@ fun ChannelCard(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
     Card(
         onClick = onClick,
         modifier = Modifier
             .aspectRatio(16f / 9f)
+            .focusable(true)
+            .onKeyEvent {
+                isFocused = it.isFocused
+                false
+            }
             .border(
-                width = if (isSelected) 3.dp else if (isEditMode) 1.dp else 0.dp,
-                color = if (isSelected) com.streamlab.tv.ui.theme.ErrorRed else if (isEditMode) com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.5f) else Color.Transparent,
+                width = when {
+                    isFocused && !isEditMode -> 3.dp
+                    isSelected -> 3.dp
+                    isEditMode -> 1.dp
+                    else -> 0.dp
+                },
+                color = when {
+                    isFocused && !isEditMode -> com.streamlab.tv.ui.theme.PurpleAccent
+                    isSelected -> com.streamlab.tv.ui.theme.ErrorRed
+                    isEditMode -> com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.5f)
+                    else -> Color.Transparent
+                },
                 shape = MaterialTheme.shapes.medium
             ),
         scale = CardDefaults.scale(focusedScale = 1.08f)
