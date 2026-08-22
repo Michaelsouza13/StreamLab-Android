@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -85,14 +87,14 @@ fun MainScreen(
     // Extract unique groups/categories
     val categories = remember(channels) {
         val uniqueGroups = channels.map { it.group.trim() }.filter { it.isNotEmpty() }.distinct()
-        listOf("Todos") + uniqueGroups
+        listOf("Todos", "Favoritos") + uniqueGroups
     }
 
     val filteredChannels = remember(channels, selectedCategory) {
-        if (selectedCategory == "Todos") {
-            channels
-        } else {
-            channels.filter { it.group.equals(selectedCategory, ignoreCase = true) }
+        when {
+            selectedCategory == "Todos" -> channels
+            selectedCategory == "Favoritos" -> channels.filter { it.isFavorite }
+            else -> channels.filter { it.group.equals(selectedCategory, ignoreCase = true) }
         }
     }
 
@@ -232,6 +234,9 @@ fun MainScreen(
                             } else {
                                 selectedChannels.add(channel)
                             }
+                        },
+                        onToggleFavorite = { channel ->
+                            viewModel.toggleFavorite(channel)
                         }
                     )
                 }
@@ -263,7 +268,8 @@ fun ChannelGrid(
     isEditMode: Boolean,
     selectedChannels: List<ChannelEntity>,
     onChannelClick: (ChannelEntity) -> Unit,
-    onChannelToggleSelect: (ChannelEntity) -> Unit
+    onChannelToggleSelect: (ChannelEntity) -> Unit,
+    onToggleFavorite: (ChannelEntity) -> Unit
 ) {
     if (channels.isEmpty()) {
         Box(
@@ -289,7 +295,8 @@ fun ChannelGrid(
                     channel = channel,
                     isSelected = selectedChannels.contains(channel),
                     isEditMode = isEditMode,
-                    onClick = { onChannelClick(channel) }
+                    onClick = { onChannelClick(channel) },
+                    onToggleFavorite = { onToggleFavorite(channel) }
                 )
             }
         }
@@ -301,7 +308,8 @@ fun ChannelCard(
     channel: ChannelEntity,
     isSelected: Boolean,
     isEditMode: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -353,6 +361,29 @@ fun ChannelCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Favorite Star (top-left, always visible when not in edit mode)
+            if (!isEditMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (channel.isFavorite) com.streamlab.tv.ui.theme.PurpleAccent
+                            else Color.Black.copy(alpha = 0.5f)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (channel.isFavorite) Icons.Filled.Star else Icons.Outlined.Star,
+                        contentDescription = if (channel.isFavorite) "Remover dos favoritos" else "Adicionar aos favoritos",
+                        tint = if (channel.isFavorite) Color.Yellow else Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
             if (isEditMode) {

@@ -47,6 +47,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -621,6 +623,15 @@ fun PlayerScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
+                                if (currentChannel?.isFavorite == true) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = "Favoritado",
+                                        tint = Color.Yellow,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
                                 if (isLiveStream) {
                                     Box(
                                         modifier = Modifier
@@ -834,6 +845,30 @@ fun PlayerScreen(
                             Icon(Icons.Default.Close, contentDescription = "Ocultar")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Ocultar")
+                        }
+
+                        // Favorite Button
+                        Button(
+                            onClick = {
+                                interactionTick++
+                                currentChannel?.let { channel ->
+                                    viewModel.toggleFavorite(channel)
+                                }
+                            },
+                            colors = ButtonDefaults.colors(
+                                containerColor = if (currentChannel?.isFavorite == true)
+                                    com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.7f)
+                                else Color.White.copy(alpha = 0.1f),
+                                focusedContainerColor = com.streamlab.tv.ui.theme.PurpleAccent
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (currentChannel?.isFavorite == true) Icons.Filled.Star else Icons.Outlined.Star,
+                                contentDescription = if (currentChannel?.isFavorite == true) "Remover dos favoritos" else "Adicionar aos favoritos",
+                                tint = if (currentChannel?.isFavorite == true) Color.Yellow else Color.White
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (currentChannel?.isFavorite == true) "Favoritado" else "Favoritar")
                         }
                     }
                 }

@@ -26,6 +26,12 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE url = :url LIMIT 1")
     suspend fun getChannelByUrl(url: String): ChannelEntity?
 
+    @Query("SELECT * FROM channels WHERE isFavorite = 1")
+    fun getFavorites(): Flow<List<ChannelEntity>>
+
+    @Query("UPDATE channels SET isFavorite = :isFavorite WHERE id = :id")
+    suspend fun toggleFavorite(id: Long, isFavorite: Boolean)
+
     @androidx.room.Delete
     suspend fun deleteChannel(channel: ChannelEntity)
 

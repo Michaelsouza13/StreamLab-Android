@@ -83,6 +83,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun toggleFavorite(channel: ChannelEntity) {
+        viewModelScope.launch {
+            channelDao.toggleFavorite(channel.id, !channel.isFavorite)
+        }
+    }
+
     fun searchTmdb(query: String, customApiKey: String? = null) {
         viewModelScope.launch {
             _isTmdbSearching.value = true
