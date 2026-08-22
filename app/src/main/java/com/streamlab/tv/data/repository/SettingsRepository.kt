@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,6 +25,7 @@ class SettingsRepository @Inject constructor(
 
     private val m3uUrlKey = stringPreferencesKey("m3u_url")
     private val tmdbKeyKey = stringPreferencesKey("tmdb_key")
+    private val activePlaylistIdKey = longPreferencesKey("active_playlist_id")
 
     val m3uUrlFlow: Flow<String> = context.dataStore.data.map { preferences ->
         val saved = preferences[m3uUrlKey]
@@ -32,6 +34,10 @@ class SettingsRepository @Inject constructor(
 
     val tmdbKeyFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[tmdbKeyKey] ?: ""
+    }
+
+    val activePlaylistIdFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[activePlaylistIdKey] ?: 0L
     }
 
     suspend fun saveM3uUrl(url: String) {
@@ -43,6 +49,12 @@ class SettingsRepository @Inject constructor(
     suspend fun saveTmdbKey(key: String) {
         context.dataStore.edit { preferences ->
             preferences[tmdbKeyKey] = key
+        }
+    }
+
+    suspend fun saveActivePlaylistId(id: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[activePlaylistIdKey] = id
         }
     }
 }

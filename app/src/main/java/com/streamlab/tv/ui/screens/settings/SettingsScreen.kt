@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -24,11 +28,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.streamlab.tv.data.local.PlaylistEntity
 
 @Composable
 fun SettingsScreen(
@@ -39,6 +47,12 @@ fun SettingsScreen(
     val tmdbKey by viewModel.tmdbKey.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncMessage by viewModel.syncMessage.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
+    val activePlaylist by viewModel.activePlaylist.collectAsState()
+
+    var newPlaylistName by remember { mutableStateOf("") }
+    var newPlaylistUrl by remember { mutableStateOf("") }
+    var showAddForm by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -52,21 +66,149 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
 
+        // --- Playlists Section ---
         Column(
             modifier = Modifier
-                .width(500.dp)
+                .width(600.dp)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(text = "Playlist M3U8 URL:", color = Color.White)
-            TvTextField(
-                value = m3uUrl,
-                onValueChange = { viewModel.updateM3uUrl(it) },
-                placeholder = "https://exemplo.com/playlist.m3u"
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Playlists",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { showAddForm = !showAddForm },
+                        colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.PurpleAccent)
+                    ) {
+                        Text(if (showAddForm) "Cancelar" else "+ Nova Playlist")
+                    }
+                }
+            }
+
+            if (showAddForm) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Text("Nome:", color = Color.LightGray, fontSize = 12.sp)
+                    TvTextField(
+                        value = newPlaylistName,
+                        onValueChange = { newPlaylistName = it },
+                        placeholder = "Minha Lista"
+                    )
+                    Text("URL M3U:", color = Color.LightGray, fontSize = 12.sp)
+                    TvTextField(
+                        value = newPlaylistUrl,
+                        onValueChange = { newPlaylistUrl = it },
+                        placeholder = "https://exemplo.com/playlist.m3u"
+                    )
+                    Button(
+                        onClick = {
+                            if (newPlaylistName.isNotBlank() && newPlaylistUrl.isNotBlank()) {
+                                viewModel.addPlaylist(newPlaylistName.trim(), newPlaylistUrl.trim())
+                                newPlaylistName = ""
+                                newPlaylistUrl = ""
+                                showAddForm = false
+                            }
+                        }
+                    ) {
+                        Text("Salvar")
+                    }
+                }
+            }
+
+            if (playlists.isEmpty()) {
+                Text(
+                    text = "Nenhuma playlist adicionada.",
+                    color = Color.Gray,
+                    modifier = Modifier.padding(8.dp)
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.height(200.dp)
+                ) {
+                    items(playlists) { playlist ->
+                        val isActive = playlist.id == activePlaylist?.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isActive) com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.2f)
+                                    else Color.Black.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = playlist.name,
+                                        color = Color.White,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 14.sp
+                                    )
+                                    if (isActive) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "ATIVA",
+                                            color = com.streamlab.tv.ui.theme.PurpleAccent,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = playlist.url,
+                                    color = Color.Gray,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (!isActive) {
+                                    Button(
+                                        onClick = { viewModel.switchPlaylist(playlist.id) },
+                                        colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.PurpleAccent)
+                                    ) {
+                                        Text("Ativar", fontSize = 11.sp)
+                                    }
+                                }
+                                Button(
+                                    onClick = { viewModel.reSyncPlaylist(playlist) },
+                                    enabled = !isSyncing
+                                ) {
+                                    Text("Sync", fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = { viewModel.deletePlaylist(playlist) },
+                                    colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.ErrorRed)
+                                ) {
+                                    Text("X", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
+        // --- TMDB Section ---
         Column(
             modifier = Modifier
                 .width(500.dp)
@@ -96,12 +238,6 @@ fun SettingsScreen(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(
-                onClick = { viewModel.syncPlaylist() },
-                enabled = !isSyncing
-            ) {
-                Text(if (isSyncing) "Sincronizando..." else "Salvar e Sincronizar")
-            }
             Button(onClick = onBackPressed) {
                 Text("Voltar")
             }
@@ -144,4 +280,3 @@ fun TvTextField(
         }
     )
 }
-

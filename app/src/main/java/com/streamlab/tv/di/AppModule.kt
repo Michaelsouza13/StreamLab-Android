@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.streamlab.tv.data.local.AppDatabase
 import com.streamlab.tv.data.local.ChannelDao
+import com.streamlab.tv.data.local.PlaylistDao
 import com.streamlab.tv.data.remote.M3uApi
 import com.streamlab.tv.data.remote.TmdbApi
 import dagger.Module
@@ -36,6 +37,11 @@ object AppModule {
     @Provides
     fun provideChannelDao(database: AppDatabase): ChannelDao {
         return database.channelDao()
+    }
+
+    @Provides
+    fun providePlaylistDao(database: AppDatabase): PlaylistDao {
+        return database.playlistDao()
     }
 
     @Provides

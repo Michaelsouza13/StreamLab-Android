@@ -11,11 +11,17 @@ interface ChannelDao {
     @Query("SELECT * FROM channels")
     fun getAllChannels(): Flow<List<ChannelEntity>>
 
+    @Query("SELECT * FROM channels WHERE playlistId = :playlistId")
+    fun getChannelsByPlaylist(playlistId: Long): Flow<List<ChannelEntity>>
+
     @Query("SELECT * FROM channels WHERE `group` = :group")
     fun getChannelsByGroup(group: String): Flow<List<ChannelEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChannels(channels: List<ChannelEntity>)
+
+    @Query("DELETE FROM channels WHERE playlistId = :playlistId")
+    suspend fun clearChannelsForPlaylist(playlistId: Long)
 
     @Query("DELETE FROM channels")
     suspend fun clearChannels()
@@ -28,6 +34,9 @@ interface ChannelDao {
 
     @Query("SELECT * FROM channels WHERE isFavorite = 1")
     fun getFavorites(): Flow<List<ChannelEntity>>
+
+    @Query("SELECT * FROM channels WHERE isFavorite = 1 AND playlistId = :playlistId")
+    fun getFavoritesByPlaylist(playlistId: Long): Flow<List<ChannelEntity>>
 
     @Query("UPDATE channels SET isFavorite = :isFavorite WHERE id = :id")
     suspend fun toggleFavorite(id: Long, isFavorite: Boolean)

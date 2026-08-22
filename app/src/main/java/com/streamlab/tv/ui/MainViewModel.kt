@@ -4,35 +4,64 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.streamlab.tv.data.local.ChannelDao
 import com.streamlab.tv.data.local.ChannelEntity
+import com.streamlab.tv.data.local.PlaylistDao
+import com.streamlab.tv.data.local.PlaylistEntity
 import com.streamlab.tv.data.repository.SettingsRepository
 import com.streamlab.tv.data.repository.SyncRepository
 import com.streamlab.tv.data.repository.TmdbMediaInfo
 import com.streamlab.tv.data.repository.TmdbRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val channelDao: ChannelDao,
+    private val playlistDao: PlaylistDao,
     private val syncRepository: SyncRepository,
     private val settingsRepository: SettingsRepository,
     private val tmdbRepository: TmdbRepository
 ) : ViewModel() {
 
-    val channels: StateFlow<List<ChannelEntity>> = channelDao.getAllChannels()
+    private val _activePlaylistId = MutableStateFlow<Long>(0L)
+
+    val playlists: StateFlow<List<PlaylistEntity>> = playlistDao.getAllPlaylists()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
-    
+
+    val activePlaylist: StateFlow<PlaylistEntity?> = playlistDao.getActivePlaylist()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val channels: StateFlow<List<ChannelEntity>> = _activePlaylistId.flatMapLatest { playlistId ->
+        if (playlistId > 0) {
+            channelDao.getChannelsByPlaylist(playlistId)
+        } else {
+            channelDao.getAllChannels()
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     private val _currentChannel = MutableStateFlow<ChannelEntity?>(null)
     val currentChannel: StateFlow<ChannelEntity?> = _currentChannel.asStateFlow()
 
@@ -53,19 +82,89 @@ class MainViewModel @Inject constructor(
             val key = settingsRepository.tmdbKeyFlow.first()
             _tmdbApiKey.value = key
         }
+        viewModelScope.launch {
+            settingsRepository.activePlaylistIdFlow.collect { id ->
+                _activePlaylistId.value = id
+            }
+        }
     }
 
     fun syncDefaultPlaylistIfNeeded() {
         viewModelScope.launch {
-            val currentChannels = channelDao.getAllChannels().first()
-            if (currentChannels.isEmpty()) {
-                _isSyncing.value = true
+            val existingPlaylists = playlists.value
+            if (existingPlaylists.isEmpty()) {
                 val m3uUrl = settingsRepository.m3uUrlFlow.first()
                 val effectiveUrl = if (m3uUrl.isBlank()) SettingsRepository.DEFAULT_M3U_URL else m3uUrl
                 val tmdbKey = settingsRepository.tmdbKeyFlow.first()
-                syncRepository.syncPlaylist(effectiveUrl, tmdbKey)
+
+                _isSyncing.value = true
+                val playlistId = playlistDao.insertPlaylist(
+                    PlaylistEntity(
+                        name = "Padrão",
+                        url = effectiveUrl,
+                        isDefault = true,
+                        isActive = true
+                    )
+                )
+                settingsRepository.saveActivePlaylistId(playlistId)
+                _activePlaylistId.value = playlistId
+
+                val currentChannels = channelDao.getChannelsByPlaylist(playlistId).first()
+                if (currentChannels.isEmpty()) {
+                    syncRepository.syncPlaylistForId(playlistId, effectiveUrl, tmdbKey)
+                }
                 _isSyncing.value = false
             }
+        }
+    }
+
+    fun switchPlaylist(playlistId: Long) {
+        viewModelScope.launch {
+            playlistDao.deactivateAll()
+            playlistDao.setActive(playlistId)
+            settingsRepository.saveActivePlaylistId(playlistId)
+            _activePlaylistId.value = playlistId
+        }
+    }
+
+    fun addPlaylist(name: String, url: String) {
+        viewModelScope.launch {
+            playlistDao.insertPlaylist(
+                PlaylistEntity(name = name, url = url)
+            )
+        }
+    }
+
+    fun deletePlaylist(playlist: PlaylistEntity) {
+        viewModelScope.launch {
+            playlistDao.deletePlaylist(playlist)
+            if (playlist.isActive) {
+                val remaining = playlists.value.firstOrNull { it.id != playlist.id }
+                if (remaining != null) {
+                    switchPlaylist(remaining.id)
+                } else {
+                    settingsRepository.saveActivePlaylistId(0L)
+                    _activePlaylistId.value = 0L
+                }
+            }
+        }
+    }
+
+    fun updatePlaylist(playlist: PlaylistEntity) {
+        viewModelScope.launch {
+            playlistDao.updatePlaylist(playlist)
+        }
+    }
+
+    fun reSyncPlaylist(playlist: PlaylistEntity) {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            val tmdbKey = settingsRepository.tmdbKeyFlow.first()
+            syncRepository.syncPlaylistForId(playlist.id, playlist.url, tmdbKey)
+            if (playlist.isActive) {
+                _activePlaylistId.value = playlist.id
+            }
+            _isSyncing.value = false
         }
     }
 
@@ -98,7 +197,6 @@ class MainViewModel @Inject constructor(
                 customApiKey
             } else {
                 val savedKey = settingsRepository.tmdbKeyFlow.first()
-                // Default fallback demo TMDB key if none provided to ensure TMDB lookup works out-of-the-box
                 if (savedKey.isNotBlank()) savedKey else "8414a0a520bf05b6329c368d1844e1f7"
             }
 
