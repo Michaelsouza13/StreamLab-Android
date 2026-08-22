@@ -54,6 +54,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,6 +152,14 @@ fun PlayerScreen(
     var isLiveStream by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var currentResizeMode by remember { mutableStateOf(TvResizeMode.FIT) }
+
+    // Retry state
+    var retryCount by remember { mutableIntStateOf(0) }
+    var isRetrying by remember { mutableStateOf(false) }
+    val maxRetries = 3
+
+    // Stream info (resolution / bitrate)
+    var streamInfo by remember { mutableStateOf("") }
 
     // User interaction tick to reset auto-hide countdown
     var interactionTick by remember { mutableLongStateOf(0L) }
@@ -270,8 +279,27 @@ fun PlayerScreen(
                 isBuffering = playbackState == Player.STATE_BUFFERING
                 if (playbackState == Player.STATE_READY) {
                     errorMessage = null
+                    retryCount = 0
+                    isRetrying = false
                     isLiveStream = exoPlayer.isCurrentMediaItemLive || exoPlayer.duration <= 0
                     durationMs = if (exoPlayer.duration > 0) exoPlayer.duration else 0L
+
+                    // Extract stream info (resolution / bitrate)
+                    val videoFormat = exoPlayer.videoFormat
+                    if (videoFormat != null) {
+                        val w = videoFormat.width
+                        val h = videoFormat.height
+                        val bitrate = videoFormat.bitrate
+                        streamInfo = buildString {
+                            if (w > 0 && h > 0) append("${w}x${h}")
+                            if (bitrate > 0) {
+                                if (isNotEmpty()) append(" · ")
+                                append("${bitrate / 1000} kbps")
+                            }
+                        }
+                    } else {
+                        streamInfo = ""
+                    }
                 } else if (playbackState == Player.STATE_ENDED) {
                     isPlaying = false
                 }
@@ -283,14 +311,20 @@ fun PlayerScreen(
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
-                val reason = when (error.errorCode) {
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "Falha de conexão com a rede."
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Tempo de resposta do servidor esgotado."
-                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Canal indisponível no servidor (Erro HTTP)."
-                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "Formato do canal não reconhecido."
-                    else -> "Erro na transmissão (${error.errorCodeName})."
+                if (retryCount < maxRetries) {
+                    isRetrying = true
+                    retryCount++
+                } else {
+                    val reason = when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "Falha de conexão com a rede."
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Tempo de resposta do servidor esgotado."
+                        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Canal indisponível no servidor (Erro HTTP)."
+                        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "Formato do canal não reconhecido."
+                        else -> "Erro na transmissão (${error.errorCodeName})."
+                    }
+                    errorMessage = reason
+                    isRetrying = false
                 }
-                errorMessage = reason
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -337,7 +371,19 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(currentUrl) {
+        retryCount = 0
+        isRetrying = false
         loadStream(currentUrl)
+    }
+
+    // Retry with exponential backoff (3s, 6s, 12s)
+    LaunchedEffect(isRetrying, retryCount) {
+        if (isRetrying && retryCount in 1..maxRetries) {
+            val backoffMs = 3000L * (1L shl (retryCount - 1)) // 3s, 6s, 12s
+            delay(backoffMs)
+            isBuffering = true
+            loadStream(currentUrl)
+        }
     }
 
     // Position tracker for VOD
@@ -472,8 +518,8 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Buffering Indicator
-        if (isBuffering && errorMessage == null) {
+        // Buffering / Retry Indicator
+        if ((isBuffering || isRetrying) && errorMessage == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -486,7 +532,7 @@ fun PlayerScreen(
                 ) {
                     TvLoadingSpinner(modifier = Modifier.size(52.dp))
                     Text(
-                        text = "Carregando transmissão...",
+                        text = if (isRetrying) "Tentando reconexão ($retryCount/$maxRetries)..." else "Carregando transmissão...",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -671,7 +717,7 @@ fun PlayerScreen(
                         }
                     }
 
-                    // Clock & Format Tag
+                    // Clock, Stream Info & Format Tag
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -681,6 +727,21 @@ fun PlayerScreen(
                             color = Color.LightGray,
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        if (streamInfo.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = streamInfo,
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                         Text(
                             text = currentTimeString,
                             style = MaterialTheme.typography.headlineSmall,
@@ -785,6 +846,30 @@ fun PlayerScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("+10s")
                             }
+                        }
+
+                        // Previous Channel
+                        Button(
+                            onClick = {
+                                interactionTick++
+                                switchChannel(-1)
+                            }
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Canal anterior")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Anterior")
+                        }
+
+                        // Next Channel
+                        Button(
+                            onClick = {
+                                interactionTick++
+                                switchChannel(1)
+                            }
+                        ) {
+                            Icon(Icons.Default.ArrowForward, contentDescription = "Próximo canal")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Próximo")
                         }
 
                         // Audio Track Selector
