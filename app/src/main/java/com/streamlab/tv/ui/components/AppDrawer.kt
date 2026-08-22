@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,6 +22,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
+import com.streamlab.tv.ui.theme.AppIcons
 import com.streamlab.tv.ui.theme.SurfaceDark
 
 @Composable
@@ -48,21 +45,21 @@ fun AppDrawer(
                 verticalArrangement = Arrangement.Center
             ) {
                 DrawerItem(
-                    icon = Icons.Default.Search,
+                    icon = AppIcons.Search,
                     label = "Busca",
                     isSelected = currentRoute == "search",
                     isExpanded = it == DrawerValue.Open,
                     onClick = { onNavigate("search") }
                 )
                 DrawerItem(
-                    icon = Icons.Default.Home,
+                    icon = AppIcons.Home,
                     label = "Canais",
                     isSelected = currentRoute == "main",
                     isExpanded = it == DrawerValue.Open,
                     onClick = { onNavigate("main") }
                 )
                 DrawerItem(
-                    icon = Icons.Default.Settings,
+                    icon = AppIcons.Settings,
                     label = "Ajustes",
                     isSelected = currentRoute == "settings",
                     isExpanded = it == DrawerValue.Open,
