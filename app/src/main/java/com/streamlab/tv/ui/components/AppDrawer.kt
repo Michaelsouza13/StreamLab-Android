@@ -50,9 +50,9 @@ fun AppDrawer(
                 DrawerItem(
                     icon = Icons.Default.Search,
                     label = "Busca",
-                    isSelected = false,
+                    isSelected = currentRoute == "search",
                     isExpanded = it == DrawerValue.Open,
-                    onClick = { /* TODO */ }
+                    onClick = { onNavigate("search") }
                 )
                 DrawerItem(
                     icon = Icons.Default.Home,

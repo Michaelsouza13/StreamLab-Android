@@ -66,7 +66,8 @@ import com.streamlab.tv.ui.components.EditChannelDialog
 fun MainScreen(
     viewModel: MainViewModel = hiltViewModel(),
     onNavigateToPlayer: (String) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToSearch: () -> Unit = {}
 ) {
     val channels by viewModel.channels.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
@@ -101,8 +102,9 @@ fun MainScreen(
     AppDrawer(
         currentRoute = "main",
         onNavigate = { route ->
-            if (route == "settings") {
-                onNavigateToSettings()
+            when (route) {
+                "settings" -> onNavigateToSettings()
+                "search" -> onNavigateToSearch()
             }
         }
     ) {

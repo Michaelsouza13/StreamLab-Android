@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.streamlab.tv.ui.MainScreen
 import com.streamlab.tv.ui.PlayerScreen
+import com.streamlab.tv.ui.screens.search.SearchScreen
 import com.streamlab.tv.ui.screens.settings.SettingsScreen
 
 object Routes {
     const val MAIN = "main"
     const val PLAYER = "player/{channelUrl}"
     const val SETTINGS = "settings"
+    const val SEARCH = "search"
 }
 
 @Composable
@@ -26,6 +28,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 },
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS)
+                },
+                onNavigateToSearch = {
+                    navController.navigate(Routes.SEARCH)
                 }
             )
         }
@@ -41,6 +46,16 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         
         composable(Routes.SETTINGS) {
             SettingsScreen(
+                onBackPressed = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.SEARCH) {
+            SearchScreen(
+                onNavigateToPlayer = { channelUrl ->
+                    val encodedUrl = java.net.URLEncoder.encode(channelUrl, "UTF-8")
+                    navController.navigate("player/$encodedUrl")
+                },
                 onBackPressed = { navController.popBackStack() }
             )
         }
