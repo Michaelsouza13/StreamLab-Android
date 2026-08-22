@@ -42,13 +42,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
@@ -827,7 +834,7 @@ fun PlayerScreen(
                             modifier = Modifier.focusRequester(primaryControlRequester)
                         ) {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = if (isPlaying) "Pausar" else "Reproduzir"
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -843,7 +850,7 @@ fun PlayerScreen(
                                     currentPositionMs = exoPlayer.currentPosition
                                 }
                             ) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "-10s")
+                                Icon(Icons.Default.FastRewind, contentDescription = "-10s")
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("-10s")
                             }
@@ -854,7 +861,7 @@ fun PlayerScreen(
                                     currentPositionMs = exoPlayer.currentPosition
                                 }
                             ) {
-                                Icon(Icons.Default.ArrowForward, contentDescription = "+10s")
+                                Icon(Icons.Default.FastForward, contentDescription = "+10s")
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("+10s")
                             }
@@ -867,7 +874,7 @@ fun PlayerScreen(
                                 switchChannel(-1)
                             }
                         ) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Canal anterior")
+                            Icon(Icons.Default.SkipPrevious, contentDescription = "Canal anterior")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Anterior")
                         }
@@ -879,7 +886,7 @@ fun PlayerScreen(
                                 switchChannel(1)
                             }
                         ) {
-                            Icon(Icons.Default.ArrowForward, contentDescription = "Próximo canal")
+                            Icon(Icons.Default.SkipNext, contentDescription = "Próximo canal")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Próximo")
                         }
@@ -891,7 +898,7 @@ fun PlayerScreen(
                                 activeDialog = PlayerDialogType.AUDIO
                             }
                         ) {
-                            Icon(Icons.Default.Settings, contentDescription = "Áudio")
+                            Icon(Icons.Default.Audiotrack, contentDescription = "Áudio")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Áudio")
                         }
@@ -903,7 +910,7 @@ fun PlayerScreen(
                                 activeDialog = PlayerDialogType.SUBTITLES
                             }
                         ) {
-                            Icon(Icons.Default.Info, contentDescription = "Legendas")
+                            Icon(Icons.Default.Subtitles, contentDescription = "Legendas")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Legendas")
                         }
@@ -915,7 +922,7 @@ fun PlayerScreen(
                                 activeDialog = PlayerDialogType.ASPECT_RATIO
                             }
                         ) {
-                            Icon(Icons.Default.Settings, contentDescription = "Formato")
+                            Icon(Icons.Default.AspectRatio, contentDescription = "Formato")
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Formato")
                         }
