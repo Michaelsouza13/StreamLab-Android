@@ -1,8 +1,7 @@
 package com.streamlab.tv.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -314,33 +312,25 @@ fun ChannelCard(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-
     Card(
         onClick = onClick,
-        modifier = Modifier
-            .aspectRatio(16f / 9f)
-            .focusable(true)
-            .onKeyEvent {
-                isFocused = it.isFocused
-                false
-            }
-            .border(
-                width = when {
-                    isFocused && !isEditMode -> 3.dp
-                    isSelected -> 3.dp
-                    isEditMode -> 1.dp
-                    else -> 0.dp
-                },
-                color = when {
-                    isFocused && !isEditMode -> com.streamlab.tv.ui.theme.PurpleAccent
-                    isSelected -> com.streamlab.tv.ui.theme.ErrorRed
-                    isEditMode -> com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.5f)
-                    else -> Color.Transparent
-                },
-                shape = MaterialTheme.shapes.medium
-            ),
-        scale = CardDefaults.scale(focusedScale = 1.08f)
+        modifier = Modifier.aspectRatio(16f / 9f),
+        scale = CardDefaults.scale(focusedScale = 1.08f),
+        border = CardDefaults.border(
+            border = when {
+                isSelected -> androidx.tv.material3.Border(BorderStroke(3.dp, com.streamlab.tv.ui.theme.ErrorRed))
+                isEditMode -> androidx.tv.material3.Border(BorderStroke(1.dp, com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.5f)))
+                else -> androidx.tv.material3.Border(BorderStroke(0.dp, Color.Transparent))
+            },
+            focusedBorder = androidx.tv.material3.Border(BorderStroke(3.dp, com.streamlab.tv.ui.theme.PurpleAccent))
+        ),
+        shape = CardDefaults.shape(shape = MaterialTheme.shapes.medium),
+        glow = CardDefaults.glow(
+            focusedGlow = androidx.tv.material3.Glow(
+                elevationColor = com.streamlab.tv.ui.theme.PurpleAccent.copy(alpha = 0.6f),
+                elevation = 8.dp
+            )
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             val imageUrl = if (!channel.posterUrl.isNullOrEmpty()) channel.posterUrl else channel.logo

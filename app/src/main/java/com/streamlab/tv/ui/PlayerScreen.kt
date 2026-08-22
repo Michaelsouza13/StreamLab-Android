@@ -1,7 +1,9 @@
 package com.streamlab.tv.ui
 
+import android.app.Activity
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -128,6 +130,15 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val channels by viewModel.channels.collectAsState()
+
+    // Keep screen on during playback — prevents Fire TV screensaver
+    DisposableEffect(Unit) {
+        val window = (context as? Activity)?.window
+        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     var currentUrl by remember { mutableStateOf(channelUrl) }
     var currentChannel by remember { mutableStateOf<ChannelEntity?>(null) }
@@ -507,6 +518,7 @@ fun PlayerScreen(
         AndroidView(
             factory = { ctx ->
                 val view = LayoutInflater.from(ctx).inflate(R.layout.player_view, null) as PlayerView
+                view.keepScreenOn = true
                 view.player = exoPlayer
                 view.resizeMode = currentResizeMode.mode
                 view
