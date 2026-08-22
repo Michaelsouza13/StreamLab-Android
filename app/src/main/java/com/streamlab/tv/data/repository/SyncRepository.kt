@@ -2,12 +2,14 @@ package com.streamlab.tv.data.repository
 
 import android.util.Log
 import com.streamlab.tv.data.local.ChannelDao
-import com.streamlab.tv.data.local.ChannelEntity
 import com.streamlab.tv.data.local.PlaylistDao
 import com.streamlab.tv.data.remote.M3uApi
 import com.streamlab.tv.utils.M3uParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -35,19 +37,22 @@ class SyncRepository @Inject constructor(
                 channelDao.insertChannels(parsedChannels)
 
                 if (tmdbApiKey.isNotBlank()) {
+                    // Fetch persisted channels with real IDs
+                    val persisted = channelDao.getAllChannelsSync()
                     CoroutineScope(Dispatchers.IO).launch {
                         Log.d("SyncRepository", "Starting background TMDB sync...")
-                        parsedChannels
+                        persisted
                             .filter {
                                 it.group.contains("filme", ignoreCase = true) ||
                                 it.group.contains("serie", ignoreCase = true) ||
                                 it.group.contains("série", ignoreCase = true)
                             }
                             .forEach { channel ->
-                                val poster = tmdbRepository.searchPoster(tmdbApiKey, channel.name)
-                                if (poster != null) {
-                                    channelDao.updateChannel(channel.copy(posterUrl = poster))
+                                val info = tmdbRepository.searchMediaInfo(tmdbApiKey, channel.name)
+                                if (info?.posterUrl != null) {
+                                    channelDao.updateChannel(channel.copy(posterUrl = info.posterUrl, description = info.overview))
                                 }
+                                delay(250)
                             }
                         Log.d("SyncRepository", "Background TMDB sync finished.")
                     }
@@ -82,18 +87,20 @@ class SyncRepository @Inject constructor(
                 channelDao.insertChannels(channelsWithPlaylistId)
 
                 if (tmdbApiKey.isNotBlank()) {
+                    val persisted = channelDao.getAllChannelsSync().filter { it.playlistId == playlistId }
                     CoroutineScope(Dispatchers.IO).launch {
-                        channelsWithPlaylistId
+                        persisted
                             .filter {
                                 it.group.contains("filme", ignoreCase = true) ||
                                 it.group.contains("serie", ignoreCase = true) ||
                                 it.group.contains("série", ignoreCase = true)
                             }
                             .forEach { channel ->
-                                val poster = tmdbRepository.searchPoster(tmdbApiKey, channel.name)
-                                if (poster != null) {
-                                    channelDao.updateChannel(channel.copy(posterUrl = poster))
+                                val info = tmdbRepository.searchMediaInfo(tmdbApiKey, channel.name)
+                                if (info?.posterUrl != null) {
+                                    channelDao.updateChannel(channel.copy(posterUrl = info.posterUrl, description = info.overview))
                                 }
+                                delay(250)
                             }
                     }
                 }
@@ -105,5 +112,28 @@ class SyncRepository @Inject constructor(
             Log.e("SyncRepository", "Error syncing playlist #$playlistId", e)
             return@withContext false
         }
+    }
+
+    fun bulkSyncPosters(apiKey: String): Flow<Pair<Int, Int>> = flow {
+        val allChannels = channelDao.getAllChannelsSync()
+        val toSync = allChannels.filter { it.posterUrl.isNullOrEmpty() }
+        val total = toSync.size
+        if (total == 0) {
+            emit(0 to 0)
+            return@flow
+        }
+        var done = 0
+        var updated = 0
+        for (channel in toSync) {
+            val info = tmdbRepository.searchMediaInfo(apiKey, channel.name)
+            if (info?.posterUrl != null) {
+                channelDao.updateChannel(channel.copy(posterUrl = info.posterUrl, description = info.overview ?: channel.description))
+                updated++
+            }
+            done++
+            emit(done to total)
+            delay(300)
+        }
+        Log.d("SyncRepository", "Bulk sync finished: $updated/$total updated")
     }
 }

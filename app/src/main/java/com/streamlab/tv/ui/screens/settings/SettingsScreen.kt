@@ -1,6 +1,7 @@
 package com.streamlab.tv.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -31,6 +33,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
@@ -49,10 +53,57 @@ fun SettingsScreen(
     val syncMessage by viewModel.syncMessage.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val activePlaylist by viewModel.activePlaylist.collectAsState()
+    val bulkProgress by viewModel.bulkProgress.collectAsState()
+    val isBulkSyncing by viewModel.isBulkSyncing.collectAsState()
+    val showBulkConfirm by viewModel.showBulkConfirm.collectAsState()
 
     var newPlaylistName by remember { mutableStateOf("") }
     var newPlaylistUrl by remember { mutableStateOf("") }
     var showAddForm by remember { mutableStateOf(false) }
+
+    // Bulk sync confirmation dialog
+    if (showBulkConfirm) {
+        Dialog(
+            onDismissRequest = { viewModel.dismissBulkConfirm() },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(480.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(com.streamlab.tv.ui.theme.SurfaceDark)
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                    .padding(24.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        text = "Sincronizar capas TMDB?",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Detectamos canais sem capa. Deseja buscar automaticamente todas as capas e informações no TMDB agora? Isso pode levar alguns minutos.",
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
+                    ) {
+                        Button(
+                            onClick = { viewModel.dismissBulkConfirm() },
+                            colors = ButtonDefaults.colors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) { Text("Depois") }
+                        Button(
+                            onClick = { viewModel.bulkSyncAllPosters() },
+                            colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.PurpleAccent)
+                        ) { Text("Sincronizar agora") }
+                    }
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -211,12 +262,12 @@ fun SettingsScreen(
         // --- TMDB Section ---
         Column(
             modifier = Modifier
-                .width(500.dp)
+                .width(550.dp)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(text = "TMDB API Key (Opcional):", color = Color.White)
+            Text(text = "TMDB API Key (Opcional):", color = Color.White, fontWeight = FontWeight.Bold)
             TvTextField(
                 value = tmdbKey,
                 onValueChange = { viewModel.updateTmdbKey(it) },
@@ -227,12 +278,52 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray
             )
+
+            // Bulk sync button + progress
+            if (tmdbKey.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = { viewModel.bulkSyncAllPosters() },
+                    enabled = !isBulkSyncing && !isSyncing,
+                    colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.PurpleAccent)
+                ) {
+                    Text(if (isBulkSyncing) "Sincronizando..." else "Sincronizar todas as capas agora")
+                }
+
+                if (isBulkSyncing && bulkProgress != null) {
+                    val (done, total) = bulkProgress!!
+                    val progress = if (total > 0) done.toFloat() / total.toFloat() else 0f
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "$done / $total", color = Color.LightGray, fontSize = 12.sp)
+                            Text(text = "${(progress * 100).toInt()}%", color = Color.LightGray, fontSize = 12.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.White.copy(alpha = 0.2f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(6.dp)
+                                    .background(com.streamlab.tv.ui.theme.PurpleAccent)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         if (syncMessage != null) {
             Text(
                 text = syncMessage!!,
-                color = if (isSyncing) com.streamlab.tv.ui.theme.PurpleAccent else Color.White,
+                color = if (isSyncing || isBulkSyncing) com.streamlab.tv.ui.theme.PurpleAccent else Color.White,
                 style = MaterialTheme.typography.bodyMedium
             )
         }

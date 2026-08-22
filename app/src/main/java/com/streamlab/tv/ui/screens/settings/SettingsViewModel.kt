@@ -2,6 +2,7 @@ package com.streamlab.tv.ui.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.streamlab.tv.data.local.ChannelDao
 import com.streamlab.tv.data.local.PlaylistDao
 import com.streamlab.tv.data.local.PlaylistEntity
 import com.streamlab.tv.data.repository.SettingsRepository
@@ -20,7 +21,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val syncRepository: SyncRepository,
-    private val playlistDao: PlaylistDao
+    private val playlistDao: PlaylistDao,
+    private val channelDao: ChannelDao
 ) : ViewModel() {
 
     private val _m3uUrl = MutableStateFlow("")
@@ -34,6 +36,15 @@ class SettingsViewModel @Inject constructor(
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    private val _bulkProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    val bulkProgress: StateFlow<Pair<Int, Int>?> = _bulkProgress.asStateFlow()
+
+    private val _isBulkSyncing = MutableStateFlow(false)
+    val isBulkSyncing: StateFlow<Boolean> = _isBulkSyncing.asStateFlow()
+
+    private val _showBulkConfirm = MutableStateFlow(false)
+    val showBulkConfirm: StateFlow<Boolean> = _showBulkConfirm.asStateFlow()
 
     val playlists: StateFlow<List<PlaylistEntity>> = playlistDao.getAllPlaylists()
         .stateIn(
@@ -54,7 +65,21 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.m3uUrlFlow.collectLatest { _m3uUrl.value = it }
         }
         viewModelScope.launch {
-            settingsRepository.tmdbKeyFlow.collectLatest { _tmdbKey.value = it }
+            var previousKey = ""
+            settingsRepository.tmdbKeyFlow.collectLatest { newKey ->
+                val wasEmpty = previousKey.isBlank()
+                val nowFilled = newKey.isNotBlank()
+                _tmdbKey.value = newKey
+                if (wasEmpty && nowFilled) {
+                    // Check if there are channels without posters to suggest bulk sync
+                    val channels = channelDao.getAllChannelsSync()
+                    val withoutPoster = channels.count { it.posterUrl.isNullOrEmpty() }
+                    if (withoutPoster > 0) {
+                        _showBulkConfirm.value = true
+                    }
+                }
+                previousKey = newKey
+            }
         }
     }
 
@@ -67,6 +92,34 @@ class SettingsViewModel @Inject constructor(
     fun updateTmdbKey(key: String) {
         viewModelScope.launch {
             settingsRepository.saveTmdbKey(key)
+        }
+    }
+
+    fun dismissBulkConfirm() {
+        _showBulkConfirm.value = false
+    }
+
+    fun bulkSyncAllPosters() {
+        if (_tmdbKey.value.isBlank() || _isBulkSyncing.value) return
+        viewModelScope.launch {
+            _isBulkSyncing.value = true
+            _isSyncing.value = true
+            _bulkProgress.value = 0 to 1
+            _syncMessage.value = "Sincronizando capas TMDB..."
+            _showBulkConfirm.value = false
+            try {
+                syncRepository.bulkSyncPosters(_tmdbKey.value).collect { (done, total) ->
+                    _bulkProgress.value = done to total
+                    _syncMessage.value = "Sincronizando capas: $done/$total"
+                }
+                _syncMessage.value = "Capas sincronizadas com sucesso!"
+            } catch (e: Exception) {
+                _syncMessage.value = "Erro na sincronização: ${e.message}"
+            } finally {
+                _isBulkSyncing.value = false
+                _isSyncing.value = false
+                _bulkProgress.value = null
+            }
         }
     }
 

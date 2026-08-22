@@ -11,6 +11,9 @@ interface ChannelDao {
     @Query("SELECT * FROM channels")
     fun getAllChannels(): Flow<List<ChannelEntity>>
 
+    @Query("SELECT * FROM channels")
+    suspend fun getAllChannelsSync(): List<ChannelEntity>
+
     @Query("SELECT * FROM channels WHERE playlistId = :playlistId")
     fun getChannelsByPlaylist(playlistId: Long): Flow<List<ChannelEntity>>
 
