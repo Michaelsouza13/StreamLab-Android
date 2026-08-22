@@ -2,7 +2,6 @@ package com.streamlab.tv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,15 +12,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -38,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -50,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -62,6 +67,7 @@ import com.streamlab.tv.data.local.ChannelEntity
 import com.streamlab.tv.data.repository.TmdbMediaInfo
 import com.streamlab.tv.ui.MainViewModel
 import com.streamlab.tv.ui.TvLoadingSpinner
+import kotlinx.coroutines.delay
 
 @Composable
 fun EditChannelDialog(
@@ -83,15 +89,29 @@ fun EditChannelDialog(
         viewModel.clearTmdbSearchResults()
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    LaunchedEffect(Unit) {
+        delay(150)
+        try { nameFocusRequester.requestFocus() } catch (_: Exception) {}
+    }
+
+    val nameFocusRequester = remember { FocusRequester() }
+    val groupFocusRequester = remember { FocusRequester() }
+    val searchButtonFocusRequester = remember { FocusRequester() }
+    val firstResultFocusRequester = remember { FocusRequester() }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Box(
             modifier = Modifier
-                .width(820.dp)
-                .fillMaxHeight(0.92f)
+                .fillMaxWidth(0.88f)
+                .fillMaxHeight(0.88f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(com.streamlab.tv.ui.theme.SurfaceDark)
                 .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
                 .padding(24.dp)
+                .imePadding()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -139,7 +159,8 @@ fun EditChannelDialog(
                     Column(
                         modifier = Modifier
                             .weight(1.1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
@@ -147,11 +168,12 @@ fun EditChannelDialog(
                             color = Color.LightGray,
                             style = MaterialTheme.typography.bodySmall
                         )
-                        
+
                         CustomTvInput(
                             value = channelName,
                             onValueChange = { channelName = it },
                             placeholder = "Digite o nome...",
+                            modifier = Modifier.focusRequester(nameFocusRequester),
                             onSearch = {
                                 keyboardController?.hide()
                                 viewModel.searchTmdb(channelName)
@@ -163,11 +185,12 @@ fun EditChannelDialog(
                             color = Color.LightGray,
                             style = MaterialTheme.typography.bodySmall
                         )
-                        
+
                         CustomTvInput(
                             value = channelGroup,
                             onValueChange = { channelGroup = it },
-                            placeholder = "Ex: Filmes, Séries, Esportes..."
+                            placeholder = "Ex: Filmes, Séries, Esportes...",
+                            modifier = Modifier.focusRequester(groupFocusRequester)
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -179,7 +202,9 @@ fun EditChannelDialog(
                                 viewModel.searchTmdb(channelName)
                             },
                             colors = ButtonDefaults.colors(containerColor = com.streamlab.tv.ui.theme.PurpleAccent),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchButtonFocusRequester)
                         ) {
                             if (isSearchingTmdb) {
                                 TvLoadingSpinner(modifier = Modifier.size(20.dp))
@@ -306,9 +331,11 @@ fun EditChannelDialog(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(tmdbResults) { tmdbItem ->
+                                items(tmdbResults.size) { index ->
+                                    val tmdbItem = tmdbResults[index]
                                     TmdbResultItem(
                                         item = tmdbItem,
+                                        modifier = if (index == 0) Modifier.focusRequester(firstResultFocusRequester) else Modifier,
                                         onSelect = {
                                             channelName = tmdbItem.title
                                             if (!tmdbItem.posterUrl.isNullOrEmpty()) {
@@ -374,12 +401,13 @@ fun CustomTvInput(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    modifier: Modifier = Modifier,
     onSearch: (() -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
             .border(
@@ -417,6 +445,7 @@ fun CustomTvInput(
 @Composable
 fun TmdbResultItem(
     item: TmdbMediaInfo,
+    modifier: Modifier = Modifier,
     onSelect: () -> Unit
 ) {
     Surface(
@@ -426,7 +455,7 @@ fun TmdbResultItem(
             focusedContainerColor = com.streamlab.tv.ui.theme.PurpleAccent
         ),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
